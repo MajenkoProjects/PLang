@@ -1,0 +1,53 @@
+# Define the pins to use for the different functions
+def trigger 0
+def magazine 1
+def pump 2
+def grenade 3
+
+# A variable to store the amount of ammo we have
+def ammo 0
+
+# Link the trigger pin to the fire function - call when falling
+link trigger falling fire
+link magazine falling load
+link magazine rising empty
+
+# First off configure all the pins to input with pullups enabled
+init:       mode trigger in pullup
+            mode magazine in pullup
+            mode pump in pullup
+            mode grenade in pullup
+
+# Do an initial load if the magazine is in
+            if magazine reads 0 goto load
+            set ammo 0
+            display ammo
+            return
+
+load:       set ammo 99
+            play reload_ins.wav
+countdown:  display ammo
+            play click.wav
+            delay 250
+            dec ammo
+            if ammo gt 95 goto countdown
+            display ammo
+            return
+
+fire:       if ammo gt 0 goto goodfire
+            play click.wav
+            return
+
+goodfire:   play pr.wav
+            dec ammo
+            display ammo
+            delay 66
+            if ammo eq 0 return
+            if trigger reads 0 goto goodfire
+            return
+
+empty:      set ammo 0
+            display ammo
+            play reload_rem.wav
+            return
+
