@@ -67,6 +67,7 @@ struct event {
     op *current;
     uint32_t last;
     struct event *next;
+    uint32_t line;
 };
 
 typedef struct event event;
@@ -186,13 +187,14 @@ op *pop() {
     return opcode;
 }
 
-void addEvent(uint32_t type, uint32_t source, const char *label) {
+void addEvent(uint32_t type, uint32_t source, const char *label, uint32_t line) {
     event *e = (event *)malloc(sizeof(event));
     e->source = source;
     e->type = type;
     e->label = strdup(label);
     e->next = NULL;
     e->current = NULL;
+    e->line = line;
     e->last = digitalRead(e->source);
     if (events == NULL) {
         events = e;
@@ -397,6 +399,19 @@ op *createOpcode(char *label, char *code, char *params, uint32_t line) {
         return newop;
     }
 
+    if (!strcasecmp(code, "CALL")) {
+        if (params == NULL) {
+            syntaxerror("Syntax error", line);
+            freeop(newop);
+            return NULL;
+        }
+        // We can't know where the label is yet, so just store the name. We'll convert in the
+        // second pass.
+        newop->cval1 = strdup(params);
+        newop->opcode = CALL;
+        return newop;
+    }
+
     if (!strcasecmp(code, "GOTO")) {
         if (params == NULL) {
             syntaxerror("Syntax error", line);
@@ -555,35 +570,37 @@ op *findLabel(const char *label) {
 bool plang_pass2() {
     op *scan = program;
     while (scan) {
-        if ((scan->opcode & 0xFFF0) == GOTO) {
-            op *lab = findLabel(scan->cval1);
+        op *what = scan;
+        while ((what->opcode & 0xFFF0) == IF) {
+            what = what->alternate;
+        }
+        if ((what->opcode & 0xFFF0) == GOTO) {
+            op *lab = findLabel(what->cval1);
             if (lab == NULL) {
-                syntaxerror("Unknown label", scan->line);
+                syntaxerror("Unknown label", what->line);
                 return false;
             }
-            scan->alternate = lab;
-            free(scan->cval1);
-        } else if ((scan->opcode & 0xFFF0) == IF) {
-            if (scan->alternate == NULL) {
-                syntaxerror("Invalid jump location", scan->line);
-            } else {
-                if (scan->alternate->opcode == GOTO) {
-                    op *lab = findLabel(scan->alternate->cval1);
-                    if (lab == NULL) {
-                        syntaxerror("Unknown label", scan->line);
-                        return false;
-                    }
-                    scan->alternate->alternate = lab;
-                    free(scan->alternate->cval1);
-                }
+            what->alternate = lab;
+            free(what->cval1);
+        } else if ((what->opcode & 0xFFF0) == CALL) {
+            op *lab = findLabel(what->cval1);
+            if (lab == NULL) {
+                syntaxerror("Unknown label", what->line);
+                return false;
             }
-        }
+            what->alternate = lab;
+            free(what->cval1);
+        } 
         scan = scan->next;
     }
 
     event *escan = events;
     while (escan) {
         escan->entry = findLabel(escan->label);
+        if (escan->entry == NULL) {
+            syntaxerror("Unknown label", escan->line);
+            return false;
+        }
         //free(escan->label);
         escan = escan->next;
     }
@@ -602,6 +619,9 @@ bool plang_parse(char *line, uint32_t lineno) {
     }
 
     opcode = strtok(line, " \t");
+    if (opcode == NULL) {
+        return true;
+    }
     if (opcode[0] == '#') {
         return true;
     }
@@ -676,7 +696,7 @@ bool plang_parse(char *line, uint32_t lineno) {
             npin = v->value;
         }
 
-        addEvent(ntype, npin, label);
+        addEvent(ntype, npin, label, lineno);
         return true;
     }
 
@@ -756,6 +776,10 @@ void plang_exec(op **where) {
         case SET:
             (*where)->vval1->value = (vars & V) ? (*where)->vval2->value : (*where)->ival2;
             break;
+        case CALL:
+            push((*where)->next);
+            *where = (*where)->alternate;
+            return;
         case GOTO:
             *where = (*where)->alternate;
             return;

@@ -1,3 +1,33 @@
+# Copyright (c) 2015, Majenko Technologies
+# All rights reserved.
+# 
+# Redistribution and use in source and binary forms, with or without modification,
+# are permitted provided that the following conditions are met:
+# 
+# * Redistributions of source code must retain the above copyright notice, this
+#   list of conditions and the following disclaimer.
+# 
+# * Redistributions in binary form must reproduce the above copyright notice, this
+#   list of conditions and the following disclaimer in the documentation and/or
+#   other materials provided with the distribution.
+# 
+# * Neither the name of Majenko Technologies nor the names of its
+#   contributors may be used to endorse or promote products derived from
+#   this software without specific prior written permission.
+# 
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+# ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+# ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+# Basic M41A Pulse Rifle script.
+
 # Define the pins to use for the different functions
 def trigger 0
 def magazine 1
@@ -6,11 +36,15 @@ def grenade 3
 
 # A variable to store the amount of ammo we have
 def ammo 0
+def grenades 0
+def armed 0
 
-# Link the trigger pin to the fire function - call when falling
+# Link the pins to their various functions
 link trigger falling fire
 link magazine falling load
 link magazine rising empty
+link pump falling pull
+link pump rising push
 
 # First off configure all the pins to input with pullups enabled
 init:       mode trigger in pullup
@@ -25,6 +59,7 @@ init:       mode trigger in pullup
             return
 
 load:       set ammo 99
+            set grenades 12
             play reload_ins.wav
 countdown:  display ammo
             play click.wav
@@ -51,3 +86,28 @@ empty:      set ammo 0
             play reload_rem.wav
             return
 
+pull:       if grenades eq 0 goto pullempty
+            play pull.wav
+            dec grenades
+            return
+
+pullempty:  play pull-empty.wav
+            return
+
+push:       if grenades eq 0 goto pushempty
+            play push.wav
+            set armed 1
+            return
+
+pushempty:  play push-empty.wav
+            return
+
+grenade:    if armed eq 0 goto notarmed
+            set armed 0
+            play glfire.wav
+            delay 500
+            play boom.wav
+            return
+            
+notarmed:   play click.wav
+            return
