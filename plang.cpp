@@ -100,6 +100,20 @@ void pinMode(int pin, int mode) {
 
 struct timeval bootTime;
 
+void trim(char *str) {
+    // Right trim
+    while ((strlen(str) > 0) && ((str[strlen(str)-1] == ' ') || (str[strlen(str)-1] == '\t') || (str[strlen(str)-1] == '\r') || (str[strlen(str)-1] == '\n'))) {
+        str[strlen(str)-1] = 0;
+    }
+
+    // Left shift
+    while ((strlen(str) > 0) && ((str[0] == ' ') || (str[0] == '\t') || (str[0] == '\r') || (str[0] == '\n'))) {
+        for (char *p = str; *p; p++) {
+            *p = *(p+1);
+        }
+    }
+}
+
 uint32_t millis() {
     struct timeval currentTime;
     gettimeofday(&currentTime, NULL);
@@ -545,7 +559,7 @@ bool plang_pass2() {
             op *lab = findLabel(scan->cval1);
             if (lab == NULL) {
                 syntaxerror("Unknown label", scan->line);
-                return NULL;
+                return false;
             }
             scan->alternate = lab;
             free(scan->cval1);
@@ -557,7 +571,7 @@ bool plang_pass2() {
                     op *lab = findLabel(scan->alternate->cval1);
                     if (lab == NULL) {
                         syntaxerror("Unknown label", scan->line);
-                        return NULL;
+                        return false;
                     }
                     scan->alternate->alternate = lab;
                     free(scan->alternate->cval1);
@@ -570,13 +584,10 @@ bool plang_pass2() {
     event *escan = events;
     while (escan) {
         escan->entry = findLabel(escan->label);
-printf("Adding link to %s\n", escan->label);
-if (escan->entry == NULL) {
-    printf("Failed\n");
-}        
         //free(escan->label);
         escan = escan->next;
     }
+    return true;
 }
 
 bool plang_parse(char *line, uint32_t lineno) {
@@ -795,7 +806,6 @@ void plang_run() {
         event *scan = events;
         while (scan) {
             if (scan->current != NULL) {
-mvprintw(10, 10, "Exec: %s                    ", scan->label);
                 plang_exec(&(scan->current));
             } else {
                 uint32_t n = digitalRead(scan->source);
@@ -803,9 +813,7 @@ mvprintw(10, 10, "Exec: %s                    ", scan->label);
                     scan->last = n;
                     if (n == 0 && ((scan->type == FALLING) || (scan->type == CHANGE))) {
                         scan->current = scan->entry;
-printw("Starting %s\n", scan->label);
                     } else if (n == 1 && ((scan->type == RISING) || (scan->type == CHANGE))) {
-printw("Starting %s\n", scan->label);
                         scan->current = scan->entry;
                     }
                 }
@@ -854,7 +862,7 @@ int main(int argc, char **argv) {
 
     fclose(f);
 
-    plang_pass2();
+    if (!plang_pass2()) { return 10; }
 
     initscr();
     raw();
