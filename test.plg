@@ -45,6 +45,7 @@ link magazine falling load
 link magazine rising empty
 link pump falling pull
 link pump rising push
+link grenade falling grenade
 
 # First off configure all the pins to input with pullups enabled
 init:       mode trigger in pullup
@@ -87,26 +88,26 @@ empty:      set ammo 0
             return
 
 pull:       if grenades eq 0 goto pullempty
-            play pull.wav
+            play pumpa.wav
             dec grenades
             return
 
-pullempty:  play pull-empty.wav
+pullempty:  play pump_emptya.wav
             return
 
 push:       if grenades eq 0 goto pushempty
-            play push.wav
+            play pumpb.wav
             set armed 1
             return
 
-pushempty:  play push-empty.wav
+pushempty:  play pump_emptyb.wav
             return
 
 grenade:    if armed eq 0 goto notarmed
             set armed 0
             play glfire.wav
             delay 500
-            play boom.wav
+            play glboom.wav
             return
             
 notarmed:   play click.wav
